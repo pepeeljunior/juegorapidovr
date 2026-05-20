@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mundo Perdido — VR Explorer</title>
+    <link rel="icon" href="../assets/icons/favicon.png" type="image/png">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Spectral:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --gold:        #d4a843;
+            --gold-bright: #f0c060;
+            --gold-deep:   #8a6a20;
+            --emerald:     #4ac46a;
+            --crimson:     #d04040;
+            --azure:       #4ac8ff;
+            --amber:       #ffa838;
+            --bg:          #08110a;
+            --ink:         #e8dfc0;
+            --ink-dim:     rgba(232, 223, 192, 0.55);
+            --frame:       rgba(212, 168, 67, 0.25);
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--ink);
+            font-family: 'Spectral', serif;
+            overflow: hidden;
+            width: 100vw; height: 100vh;
+            user-select: none;
+        }
+
+        #canvas-container { width: 100%; height: 100%; }
+        canvas { display: block; }
+
+        /* ═══════════ LOADING SCREEN ═══════════ */
+        #loading {
+            position: fixed; inset: 0; background: radial-gradient(ellipse at center, #0a1608 0%, #03070a 100%);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 999;
+        }
+
+        #loading::before {
+            content: ''; position: absolute; inset: 0;
+            background:
+                radial-gradient(circle at 20% 30%, rgba(212,168,67,0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(74,200,255,0.06) 0%, transparent 50%);
+        }
+
+        .crest {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 14px; letter-spacing: 8px;
+            color: var(--gold); opacity: 0.7;
+            margin-bottom: 24px; z-index: 1;
+        }
+
+        .crest::before, .crest::after {
+            content: '◆'; margin: 0 16px; color: var(--gold-deep);
+        }
+
+        #loading h2 {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 700; font-size: 56px;
+            color: transparent;
+            background: linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 50%, var(--gold-deep) 100%);
+            -webkit-background-clip: text; background-clip: text;
+            letter-spacing: 6px; margin-bottom: 8px;
+            z-index: 1; text-align: center;
+            filter: drop-shadow(0 4px 30px rgba(212,168,67,0.3));
+        }
+
+        #loading h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 400; font-style: italic;
+            font-size: 20px; color: var(--emerald);
+            letter-spacing: 4px; margin-bottom: 60px;
+            z-index: 1; opacity: 0.85;
+        }
+
+        .progress-wrap {
+            width: 380px; z-index: 1;
+            position: relative;
+        }
+
+        .progress-wrap::before, .progress-wrap::after {
+            content: ''; position: absolute; top: 50%; transform: translateY(-50%);
+            width: 14px; height: 1px; background: var(--gold);
+        }
+        .progress-wrap::before { left: -22px; }
+        .progress-wrap::after  { right: -22px; }
+
+        .progress-bar {
+            height: 2px; background: rgba(212,168,67,0.12);
+            position: relative; overflow: hidden;
+        }
+
+        .progress-fill {
+            position: absolute; top: 0; left: 0; height: 100%;
+            background: linear-gradient(90deg, var(--gold-deep), var(--gold-bright), var(--gold));
+            width: 0%; transition: width 0.4s ease;
+            box-shadow: 0 0 12px var(--gold-bright);
+        }
+
+        .loading-hint {
+            font-family: 'Spectral', serif; font-size: 11px;
+            letter-spacing: 3px; text-transform: uppercase;
+            color: rgba(212,168,67,0.45);
+            margin-top: 22px; z-index: 1; text-align: center;
+        }
+
+        /* ═══════════ HUD ═══════════ */
+        #hud-overlay {
+            position: fixed; inset: 0;
+            pointer-events: none; z-index: 10;
+        }
+
+        /* Esquina inferior izquierda: barras */
+        .hud-stats {
+            position: absolute; bottom: 20px; left: 22px;
+            min-width: 280px;
+        }
+
+        .stat-row {
+            display: flex; align-items: center;
+            gap: 10px; margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 600; font-size: 10px;
+            letter-spacing: 3px; text-transform: uppercase;
+            color: var(--ink-dim);
+            width: 56px;
+        }
+
+        .stat-bar {
+            flex: 1; height: 8px;
+            background: rgba(8,17,10,0.85);
+            border: 1px solid var(--frame);
+            position: relative; overflow: hidden;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
+        }
+
+        .stat-bar::before {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .stat-fill {
+            height: 100%; width: 100%;
+            transition: width 0.25s ease;
+            position: relative;
+        }
+        .stat-fill::after {
+            content: ''; position: absolute; right: 0; top: 0; bottom: 0;
+            width: 2px; background: rgba(255,255,255,0.7);
+            box-shadow: 0 0 6px currentColor;
+        }
+
+        .hp-fill      { background: linear-gradient(90deg, #8a1818, var(--crimson)); color: var(--crimson); }
+        .mana-fill    { background: linear-gradient(90deg, #1a4a8a, var(--azure));   color: var(--azure); }
+        .stamina-fill { background: linear-gradient(90deg, #2a6a18, var(--emerald)); color: var(--emerald); }
+        .xp-fill      { background: linear-gradient(90deg, var(--gold-deep), var(--gold-bright)); color: var(--gold); }
+
+        /* Esquina superior izquierda: nivel */
+        .hud-level {
+            position: absolute; top: 22px; left: 22px;
+            background: rgba(8,17,10,0.85);
+            border: 1px solid var(--frame);
+            padding: 10px 18px 8px;
+            display: flex; align-items: center; gap: 14px;
+        }
+        .hud-level::before, .hud-level::after {
+            content: ''; position: absolute; width: 8px; height: 8px;
+            border: 1px solid var(--gold);
+        }
+        .hud-level::before { top: -2px; left: -2px; border-right: none; border-bottom: none; }
+        .hud-level::after  { bottom: -2px; right: -2px; border-left: none; border-top: none; }
+
+        .lvl-icon {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 36px; font-weight: 700; line-height: 1;
+            color: var(--gold-bright);
+            text-shadow: 0 0 12px rgba(240,192,96,0.5);
+        }
+
+        .lvl-info { display: flex; flex-direction: column; gap: 4px; }
+
+        .lvl-label {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 11px; letter-spacing: 4px;
+            color: var(--gold);
+            text-transform: uppercase;
+        }
+
+        .xp-bar {
+            width: 140px; height: 4px;
+            background: rgba(212,168,67,0.15);
+            position: relative; overflow: hidden;
+        }
+
+        .xp-text {
+            font-family: 'Spectral', serif; font-size: 10px;
+            color: var(--ink-dim);
+            letter-spacing: 1px;
+        }
+
+        /* Esquina superior derecha: arma */
+        .hud-weapon {
+            position: absolute; top: 22px; right: 22px;
+            background: rgba(8,17,10,0.85);
+            border: 1px solid var(--frame);
+            padding: 10px 16px;
+            display: flex; align-items: center; gap: 14px;
+            min-width: 160px;
+        }
+
+        .hud-weapon::before, .hud-weapon::after {
+            content: ''; position: absolute; width: 8px; height: 8px;
+            border: 1px solid var(--gold);
+        }
+        .hud-weapon::before { top: -2px; right: -2px; border-left: none; border-bottom: none; }
+        .hud-weapon::after  { bottom: -2px; left: -2px;  border-right: none; border-top: none; }
+
+        .weapon-icon {
+            font-size: 28px; color: var(--gold-bright);
+            text-shadow: 0 0 10px var(--gold);
+        }
+
+        .weapon-info { display: flex; flex-direction: column; }
+        .weapon-label {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 9px; letter-spacing: 3px;
+            color: var(--ink-dim); text-transform: uppercase;
+        }
+        .weapon-name {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 16px; font-weight: 600;
+            color: var(--gold-bright); letter-spacing: 2px;
+        }
+
+        /* Esquina inferior derecha: inventario */
+        .hud-inv {
+            position: absolute; bottom: 20px; right: 22px;
+            background: rgba(8,17,10,0.85);
+            border: 1px solid var(--frame);
+            padding: 10px 16px;
+            display: flex; flex-direction: column; gap: 4px;
+            min-width: 130px;
+        }
+
+        .inv-row {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px;
+        }
+        .inv-icon { font-size: 14px; }
+        .inv-label {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 10px; letter-spacing: 2px;
+            color: var(--ink-dim); text-transform: uppercase;
+            flex: 1;
+        }
+        .inv-num {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 700; font-size: 14px;
+            color: var(--gold-bright);
+        }
+
+        /* Crosshair */
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 24px; height: 24px;
+            pointer-events: none;
+        }
+        #crosshair::before, #crosshair::after,
+        #crosshair > span {
+            content: ''; position: absolute;
+            background: var(--gold);
+            box-shadow: 0 0 4px var(--gold);
+        }
+        #crosshair::before { width: 1px; height: 8px; left: 11px; top: 0;  opacity: 0.7; }
+        #crosshair::after  { width: 1px; height: 8px; left: 11px; bottom: 0; opacity: 0.7; }
+        #crosshair > span:nth-child(1) { width: 8px; height: 1px; top: 11px; left: 0;  opacity: 0.7; }
+        #crosshair > span:nth-child(2) { width: 8px; height: 1px; top: 11px; right: 0; opacity: 0.7; }
+        #crosshair > span.dot { width: 2px; height: 2px; top: 11px; left: 11px; background: var(--gold-bright); opacity: 1; }
+
+        /* Controles hint */
+        .controls-hint {
+            position: absolute; top: 22px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(8,17,10,0.7);
+            border: 1px solid var(--frame);
+            padding: 7px 18px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 11px; letter-spacing: 3px;
+            color: var(--gold); text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .controls-hint .key {
+            display: inline-block;
+            padding: 1px 6px; margin: 0 2px;
+            background: rgba(212,168,67,0.15);
+            border: 1px solid rgba(212,168,67,0.4);
+            font-size: 10px; color: var(--gold-bright);
+        }
+
+        /* Toast */
+        #toast {
+            position: absolute; top: 80px; left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: rgba(8,17,10,0.92);
+            border: 1px solid var(--gold);
+            padding: 12px 28px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 14px; letter-spacing: 4px;
+            text-transform: uppercase;
+            opacity: 0; pointer-events: none;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        #toast.show {
+            opacity: 1; transform: translateX(-50%) translateY(0);
+        }
+
+        /* Damage flash */
+        #damage-flash {
+            position: absolute; inset: 0;
+            box-shadow: inset 0 0 100px 30px rgba(208,64,64,0);
+            pointer-events: none;
+            transition: box-shadow 0.05s;
+        }
+        #damage-flash.flash {
+            animation: damageFlash 0.4s ease-out;
+        }
+        @keyframes damageFlash {
+            0%   { box-shadow: inset 0 0 200px 60px rgba(208,64,64,0.9); }
+            100% { box-shadow: inset 0 0 100px 30px rgba(208,64,64,0); }
+        }
+
+        /* Game over */
+        #game-over {
+            position: fixed; inset: 0;
+            background: rgba(8,17,10,0.96);
+            display: none;
+            align-items: center; justify-content: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+        #game-over.visible { display: flex; }
+        #game-over h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 90px; color: var(--crimson);
+            letter-spacing: 12px;
+            text-shadow: 0 0 30px rgba(208,64,64,0.5);
+            margin-bottom: 30px;
+        }
+        #game-over p {
+            font-family: 'Cormorant Garamond', serif;
+            font-style: italic; font-size: 22px;
+            color: var(--ink-dim); margin-bottom: 50px;
+            letter-spacing: 3px;
+        }
+        #game-over button {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 16px; letter-spacing: 5px;
+            padding: 14px 50px;
+            background: transparent;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+        #game-over button:hover {
+            background: var(--gold); color: var(--bg);
+            box-shadow: 0 0 30px var(--gold);
+        }
+
+        /* VR button override */
+        #VRButton {
+            position: fixed !important;
+            bottom: 30px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            z-index: 20 !important;
+            border-color: var(--gold) !important;
+        }
+
+        /* Footer */
+        #game-footer {
+            position: fixed; bottom: 0; left: 50%;
+            transform: translateX(-50%);
+            padding: 4px 16px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 10px; letter-spacing: 2px;
+            color: rgba(212,168,67,0.35);
+            text-transform: uppercase;
+            pointer-events: none; z-index: 9;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════ LOADING ═══════════ -->
+<div id="loading">
+    <div class="crest">VR EXPLORER</div>
+    <h2>MVNDO PERDIDO</h2>
+    <h3>~ una aventura en el bosque ancestral ~</h3>
+    <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="prog"></div></div>
+    </div>
+    <div class="loading-hint" id="loading-hint">Despertando el bosque...</div>
+</div>
+
+<!-- ═══════════ HUD ═══════════ -->
+<div id="hud-overlay">
+    <div id="damage-flash"></div>
+
+    <!-- Nivel + XP -->
+    <div class="hud-level">
+        <div class="lvl-icon" id="lvl-num">1</div>
+        <div class="lvl-info">
+            <div class="lvl-label">Nivel</div>
+            <div class="xp-bar"><div class="stat-fill xp-fill" id="xp-fill"></div></div>
+            <div class="xp-text"><span id="xp-current">0</span> / <span id="xp-to-next">100</span> XP</div>
+        </div>
+    </div>
+
+    <!-- Arma -->
+    <div class="hud-weapon">
+        <div class="weapon-icon" id="weapon-icon">⚔</div>
+        <div class="weapon-info">
+            <div class="weapon-label">Arma equipada</div>
+            <div class="weapon-name" id="weapon-name">ESPADA</div>
+        </div>
+    </div>
+
+    <!-- Stats: HP / Mana / Stamina -->
+    <div class="hud-stats">
+        <div class="stat-row">
+            <div class="stat-label">Vida</div>
+            <div class="stat-bar"><div class="stat-fill hp-fill" id="hp-fill"></div></div>
+        </div>
+        <div class="stat-row">
+            <div class="stat-label">Maná</div>
+            <div class="stat-bar"><div class="stat-fill mana-fill" id="mana-fill"></div></div>
+        </div>
+        <div class="stat-row">
+            <div class="stat-label">Vigor</div>
+            <div class="stat-bar"><div class="stat-fill stamina-fill" id="stamina-fill"></div></div>
+        </div>
+    </div>
+
+    <!-- Inventario -->
+    <div class="hud-inv">
+        <div class="inv-row">
+            <span class="inv-icon">🏹</span>
+            <span class="inv-label">Flechas</span>
+            <span class="inv-num" id="stat-arrows">15</span>
+        </div>
+        <div class="inv-row">
+            <span class="inv-icon">💎</span>
+            <span class="inv-label">Gemas</span>
+            <span class="inv-num" id="stat-gems">0</span>
+        </div>
+        <div class="inv-row">
+            <span class="inv-icon">☠</span>
+            <span class="inv-label">Caídos</span>
+            <span class="inv-num" id="stat-kills">0</span>
+        </div>
+    </div>
+
+    <!-- Crosshair -->
+    <div id="crosshair"><span></span><span></span><span class="dot"></span></div>
+
+    <!-- Controls hint -->
+    <div class="controls-hint">
+        <span class="key">RATÓN</span> mirar ·
+        <span class="key">WASD</span> mover ·
+        <span class="key">⇧</span> correr ·
+        <span class="key">␣</span> saltar ·
+        <span class="key">1</span><span class="key">2</span><span class="key">3</span> armas ·
+        <span class="key">CLIC</span> atacar
+    </div>
+
+    <!-- Toast -->
+    <div id="toast"></div>
+</div>
+
+<!-- ═══════════ GAME OVER ═══════════ -->
+<div id="game-over">
+    <h1>HAS CAÍDO</h1>
+    <p>el bosque guarda silencio por tu alma</p>
+    <button onclick="location.reload()">RENACER</button>
+</div>
+
+<!-- ═══════════ FOOTER ═══════════ -->
+<div id="game-footer">Mundo Perdido · VR Explorer · Práctica 3.7</div>
+
+<div id="canvas-container"></div>
+
+<!-- ═══════════ THREE.JS ═══════════ -->
+<script type="importmap">
+{
+    "imports": {
+        "three":         "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+    }
+}
+</script>
+<script type="module" src="main.js"></script>
+
+</body>
+</html>
