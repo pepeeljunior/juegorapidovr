@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mundo Perdido — VR Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Spectral:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --gold:#d4a843;--gold-bright:#f0c060;--gold-deep:#8a6a20;
+    --emerald:#4ac46a;--crimson:#d04040;--azure:#4ac8ff;
+    --bg:#040810;--bg2:#0a1218;--ink:#e8dfc0;--ink-dim:rgba(232,223,192,0.6);
+    --frame:rgba(212,168,67,0.3);
+  }
+  html,body{height:100%;font-family:'Spectral',serif;background:var(--bg);color:var(--ink);overflow-x:hidden}
+  body{
+    background:
+      radial-gradient(ellipse at top, rgba(74,200,255,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom, rgba(212,168,67,0.05) 0%, transparent 50%),
+      var(--bg);
+    min-height:100vh;
+  }
+
+  /* ============ HERO ============ */
+  .hero{
+    min-height:100vh;
+    display:flex;flex-direction:column;justify-content:center;align-items:center;
+    text-align:center;padding:60px 24px 80px;
+    position:relative;overflow:hidden;
+  }
+  .hero::before{
+    content:'';position:absolute;inset:0;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(212,168,67,0.08) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(74,200,255,0.05) 0%, transparent 40%);
+    pointer-events:none;
+  }
+  .stars{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  .stars span{
+    position:absolute;background:#fff;border-radius:50%;
+    box-shadow:0 0 6px #fff;opacity:0.6;
+    animation:twinkle 3s infinite ease-in-out;
+  }
+  @keyframes twinkle{
+    0%,100%{opacity:0.3;transform:scale(0.8)}
+    50%{opacity:1;transform:scale(1.2)}
+  }
+  .hero-inner{position:relative;z-index:1;max-width:900px}
+
+  .crest{
+    font-family:'Cormorant Garamond',serif;
+    font-size:14px;letter-spacing:8px;color:var(--gold);opacity:0.8;
+    margin-bottom:24px;
+  }
+  .crest::before,.crest::after{content:'◆';margin:0 16px;color:var(--gold-deep)}
+
+  .hero h1{
+    font-family:'Cormorant Garamond',serif;
+    font-weight:700;font-size:clamp(48px,8vw,96px);
+    color:transparent;
+    background:linear-gradient(180deg,var(--gold-bright) 0%,var(--gold) 50%,var(--gold-deep) 100%);
+    -webkit-background-clip:text;background-clip:text;
+    letter-spacing:6px;margin-bottom:12px;
+    filter:drop-shadow(0 4px 30px rgba(212,168,67,0.3));
+    animation:fadeUp 1s ease-out;
+  }
+  .hero h2{
+    font-family:'Cormorant Garamond',serif;
+    font-weight:400;font-style:italic;
+    font-size:clamp(18px,2.5vw,24px);color:var(--emerald);
+    letter-spacing:4px;margin-bottom:40px;opacity:0.9;
+    animation:fadeUp 1s 0.2s ease-out backwards;
+  }
+  .hero-desc{
+    max-width:600px;margin:0 auto 50px;
+    font-size:17px;line-height:1.7;color:var(--ink-dim);
+    animation:fadeUp 1s 0.4s ease-out backwards;
+  }
+
+  .cta-wrap{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;animation:fadeUp 1s 0.6s ease-out backwards}
+  .cta{
+    display:inline-block;padding:18px 50px;
+    font-family:'Cormorant Garamond',serif;
+    font-size:18px;letter-spacing:5px;text-transform:uppercase;
+    text-decoration:none;
+    background:transparent;border:1px solid var(--gold);color:var(--gold);
+    transition:all 0.3s;cursor:pointer;
+    position:relative;overflow:hidden;
+  }
+  .cta::before{
+    content:'';position:absolute;inset:0;
+    background:linear-gradient(90deg,transparent,rgba(240,192,96,0.2),transparent);
+    transform:translateX(-100%);transition:transform 0.5s;
+  }
+  .cta:hover{background:var(--gold);color:var(--bg);box-shadow:0 0 30px var(--gold)}
+  .cta:hover::before{transform:translateX(100%)}
+  .cta.secondary{border-color:var(--azure);color:var(--azure)}
+  .cta.secondary:hover{background:var(--azure);color:var(--bg);box-shadow:0 0 30px var(--azure)}
+
+  /* ============ SECCIONES ============ */
+  section{padding:80px 24px;max-width:1100px;margin:0 auto}
+  .section-title{
+    font-family:'Cormorant Garamond',serif;
+    font-size:42px;letter-spacing:6px;color:var(--gold-bright);
+    text-align:center;margin-bottom:14px;
+  }
+  .section-title::before,.section-title::after{
+    content:'·';margin:0 20px;color:var(--gold-deep);
+  }
+  .section-sub{
+    text-align:center;font-style:italic;color:var(--ink-dim);
+    font-family:'Cormorant Garamond',serif;font-size:18px;
+    letter-spacing:2px;margin-bottom:60px;
+  }
+
+  /* ============ CONTROLES ============ */
+  .ctrl-grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:24px;
+  }
+  .ctrl-card{
+    background:rgba(10,18,24,0.7);border:1px solid var(--frame);
+    padding:32px 28px;position:relative;transition:all 0.3s;
+  }
+  .ctrl-card::before,.ctrl-card::after{
+    content:'';position:absolute;width:12px;height:12px;border:1px solid var(--gold);
+  }
+  .ctrl-card::before{top:-2px;left:-2px;border-right:none;border-bottom:none}
+  .ctrl-card::after{bottom:-2px;right:-2px;border-left:none;border-top:none}
+  .ctrl-card:hover{border-color:var(--gold);transform:translateY(-3px)}
+  .ctrl-card h3{
+    font-family:'Cormorant Garamond',serif;font-weight:600;
+    font-size:24px;color:var(--gold-bright);
+    letter-spacing:3px;margin-bottom:20px;
+  }
+  .ctrl-card h3 .icon{font-size:30px;margin-right:10px}
+  .ctrl-card ul{list-style:none}
+  .ctrl-card li{
+    padding:8px 0;border-bottom:1px dashed rgba(212,168,67,0.15);
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:14px;color:var(--ink-dim);
+  }
+  .ctrl-card li:last-child{border-bottom:none}
+  .ctrl-card li .what{font-family:'Cormorant Garamond',serif;letter-spacing:2px}
+  .key{
+    display:inline-block;padding:3px 10px;
+    background:rgba(212,168,67,0.12);
+    border:1px solid rgba(212,168,67,0.4);
+    font-family:'Cormorant Garamond',serif;
+    font-size:12px;color:var(--gold-bright);letter-spacing:1px;
+    margin-left:4px;
+  }
+
+  /* ============ INTEGRANTES ============ */
+  .team{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:30px;max-width:850px;margin:0 auto;
+  }
+  .member{
+    text-align:center;padding:30px 20px;
+    background:rgba(10,18,24,0.5);border:1px solid var(--frame);
+    position:relative;
+  }
+  .member::before{
+    content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:80px;height:80px;border-radius:50%;
+    background:radial-gradient(circle, rgba(212,168,67,0.2) 0%, transparent 70%);
+    z-index:0;
+  }
+  .member .avatar{
+    width:80px;height:80px;border-radius:50%;
+    background:linear-gradient(135deg,var(--gold-deep),var(--gold-bright));
+    margin:0 auto 18px;display:flex;align-items:center;justify-content:center;
+    font-family:'Cormorant Garamond',serif;font-size:32px;color:var(--bg);
+    font-weight:700;position:relative;z-index:1;
+    box-shadow:0 0 30px rgba(212,168,67,0.3);
+  }
+  .member h4{
+    font-family:'Cormorant Garamond',serif;font-weight:600;
+    font-size:18px;color:var(--gold-bright);
+    letter-spacing:3px;margin-bottom:6px;position:relative;z-index:1;
+  }
+  .member p{
+    font-size:13px;color:var(--ink-dim);font-style:italic;
+    letter-spacing:1px;position:relative;z-index:1;
+  }
+
+  /* ============ FOOTER ============ */
+  footer{
+    text-align:center;padding:40px 24px;
+    font-family:'Cormorant Garamond',serif;
+    font-size:13px;letter-spacing:3px;color:rgba(212,168,67,0.4);
+    text-transform:uppercase;border-top:1px solid var(--frame);
+    margin-top:60px;
+  }
+
+  /* ============ FEATURES ============ */
+  .features{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:24px;margin-top:40px;
+  }
+  .feat{
+    text-align:center;padding:30px 24px;
+    background:rgba(10,18,24,0.5);
+    border:1px solid var(--frame);
+  }
+  .feat .ic{font-size:42px;margin-bottom:14px}
+  .feat h4{
+    font-family:'Cormorant Garamond',serif;font-size:20px;
+    color:var(--gold-bright);letter-spacing:3px;margin-bottom:10px;
+  }
+  .feat p{font-size:14px;color:var(--ink-dim);line-height:1.6}
+
+  @keyframes fadeUp{
+    from{opacity:0;transform:translateY(20px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="stars" id="stars"></div>
+  <div class="hero-inner">
+    <div class="crest">VR EXPLORER</div>
+    <h1>MVNDO PERDIDO</h1>
+    <h2>~ una aventura en el bosque ancestral ~</h2>
+    <p class="hero-desc">
+      Explora un bosque encantado bajo la luz de la luna. Caza enemigos con
+      espada, arco y magia. Recoge gemas, sube de nivel y desentraña los
+      misterios de las ruinas olvidadas. Diseñado para Meta Quest 3.
+    </p>
+    <div class="cta-wrap">
+      <a class="cta" href="game/">ENTRAR AL JUEGO</a>
+      <a class="cta secondary" href="#controles">VER CONTROLES</a>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <h2 class="section-title">CARACTERÍSTICAS</h2>
+  <p class="section-sub">lo que encontrarás en el bosque</p>
+  <div class="features">
+    <div class="feat"><div class="ic">🌙</div><h4>NOCHE ETERNA</h4><p>Cielo nocturno con estrellas titilantes, luna llena y niebla atmosférica</p></div>
+    <div class="feat"><div class="ic">⚔️</div><h4>3 ARMAS</h4><p>Espada, arco con flechas físicas y magia con orbes explosivos en área</p></div>
+    <div class="feat"><div class="ic">👹</div><h4>3 ENEMIGOS</h4><p>Goblins ágiles, orcos pesados y espectros flotantes con IA propia</p></div>
+    <div class="feat"><div class="ic">💎</div><h4>PROGRESIÓN</h4><p>Sube de nivel, encuentra pociones, gemas y munición exploración libre</p></div>
+  </div>
+</section>
+
+<section id="controles">
+  <h2 class="section-title">INSTRUCCIONES</h2>
+  <p class="section-sub">domina los mandos del aventurero</p>
+
+  <div class="ctrl-grid">
+    <div class="ctrl-card">
+      <h3><span class="icon">⌨</span>TECLADO + RATÓN</h3>
+      <ul>
+        <li><span class="what">Moverse</span><span><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span></span></li>
+        <li><span class="what">Correr</span><span class="key">SHIFT</span></li>
+        <li><span class="what">Saltar</span><span class="key">␣</span></li>
+        <li><span class="what">Atacar</span><span><span class="key">F</span> ó <span class="key">CLIC</span></span></li>
+        <li><span class="what">Espada</span><span class="key">1</span></li>
+        <li><span class="what">Arco</span><span class="key">2</span></li>
+        <li><span class="what">Magia</span><span class="key">3</span></li>
+        <li><span class="what">Bailar</span><span class="key">B</span></li>
+        <li><span class="what">Cámara</span><span class="key">RATÓN</span></li>
+        <li><span class="what">Silenciar</span><span class="key">M</span></li>
+        <li><span class="what">Reiniciar</span><span class="key">R</span></li>
+      </ul>
+    </div>
+
+    <div class="ctrl-card">
+      <h3><span class="icon">🥽</span>META QUEST 3</h3>
+      <ul>
+        <li><span class="what">Moverse</span><span class="key">JOYSTICK IZQ</span></li>
+        <li><span class="what">Girar</span><span class="key">JOYSTICK DER</span></li>
+        <li><span class="what">Saltar</span><span class="key">BOTÓN A</span></li>
+        <li><span class="what">Bailar</span><span class="key">BOTÓN B</span></li>
+        <li><span class="what">Atacar</span><span class="key">TRIGGER DER</span></li>
+        <li><span class="what">Cambiar arma</span><span class="key">BOTÓN X</span></li>
+        <li><span class="what">Visión</span><span class="key">MOVER CABEZA</span></li>
+      </ul>
+    </div>
+
+    <div class="ctrl-card">
+      <h3><span class="icon">⚔</span>OBJETIVOS</h3>
+      <ul>
+        <li><span class="what">Eliminar enemigos</span><span style="color:var(--crimson)">+XP</span></li>
+        <li><span class="what">Recolectar gemas</span><span style="color:var(--azure)">+10 XP</span></li>
+        <li><span class="what">Pociones de vida</span><span style="color:var(--emerald)">+40 HP</span></li>
+        <li><span class="what">Pociones de maná</span><span style="color:var(--azure)">+40 MP</span></li>
+        <li><span class="what">Paquetes de flechas</span><span style="color:var(--gold-bright)">+5</span></li>
+        <li><span class="what">Subir de nivel</span><span style="color:var(--gold-bright)">Stats+</span></li>
+        <li><span class="what">Explorar ruinas</span><span style="color:var(--ink-dim)">descubre</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="equipo">
+  <h2 class="section-title">EQUIPO</h2>
+  <p class="section-sub">los desarrolladores del bosque</p>
+  <div class="team">
+    <div class="member">
+      <div class="avatar">P</div>
+      <h4>PEPE EL JUNIOR</h4>
+      <p>Desarrollo &amp; Diseño</p>
+    </div>
+    <!-- Para añadir más integrantes, copia este bloque:
+    <div class="member">
+      <div class="avatar">X</div>
+      <h4>NOMBRE COMPLETO</h4>
+      <p>Rol en el equipo</p>
+    </div>
+    -->
+  </div>
+</section>
+
+<footer>
+  Práctica 3.7 · Escenarios VR · Graficación 2026 · Three.js + WebXR
+</footer>
+
+<script>
+  // Generar estrellas aleatorias en el hero
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement('span');
+    s.style.left = Math.random() * 100 + '%';
+    s.style.top  = Math.random() * 100 + '%';
+    const size = Math.random() * 2 + 1;
+    s.style.width = size + 'px';
+    s.style.height = size + 'px';
+    s.style.animationDelay = Math.random() * 3 + 's';
+    s.style.animationDuration = (2 + Math.random() * 2) + 's';
+    starsEl.appendChild(s);
+  }
+</script>
+</body>
+</html>

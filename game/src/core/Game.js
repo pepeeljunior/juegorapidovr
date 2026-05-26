@@ -95,7 +95,7 @@ export class Game {
         this.player.character.group.visible = false;
 
         // ── UI ──────────────────────────────────────────────────────────
-        this.hud   = new HUD();
+        this.hud = new HUD(this.renderer);
         this.vrHud = new VRHud(this.scene, this.renderer);
 
         // ── VR controllers ──────────────────────────────────────────────
