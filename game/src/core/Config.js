@@ -8,9 +8,9 @@ import * as THREE from 'three';
 export const WORLD = {
     HALF_SIZE:      60,
     GROUND_Y:        0,
-    FOG_COLOR:       new THREE.Color(0x2a3050),   // nocturno azulado
-    FOG_DENSITY:     0.013,
-    SKY_COLOR:       new THREE.Color(0x0a0e2a),   // azul medianoche
+    FOG_COLOR:       new THREE.Color(0x1a2040),   // nocturno azulado
+    FOG_DENSITY:     0.007,                        // FIX: era 0.013 — muy denso, cortaba la vista a ~15m
+    SKY_COLOR:       new THREE.Color(0x0a0e2a),
 };
 
 // ── FÍSICA ────────────────────────────────────────────────────────────────

@@ -43,7 +43,7 @@ export class Game {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping         = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.0;
+        this.renderer.toneMappingExposure = 1.6;   // FIX: era 1.0 — subido para escena nocturna
         this.renderer.outputColorSpace    = THREE.SRGBColorSpace;
         this.renderer.xr.enabled = true;
         document.getElementById('canvas-container').appendChild(this.renderer.domElement);
@@ -81,11 +81,22 @@ export class Game {
         // HDR removido — el Skybox procedural ya da el ambiente nocturno.
 
         // ── Entidades ───────────────────────────────────────────────────
-        this.enemies     = new Enemies(this.scene, this.particles);
+        this.enemies      = new Enemies(this.scene, this.particles);
         this.collectibles = new Collectibles(this.scene, this.particles);
 
+        // ── VR controllers (ANTES del jugador para poder pasarlos) ──────
+        // FIX: vrControllers se crea aquí, antes de PlayerController.
+        // El segundo argumento (playerRig) es el cameraRig.rig, que actúa
+        // como el "cuerpo" del jugador en VR.
+        this.vrControllers = new VRControllers(this.scene, this.renderer, this.cameraRig.rig);
+
         // ── Jugador ─────────────────────────────────────────────────────
-        this.player = new PlayerController(this.scene, this.assets, this.input, this.audio, this.particles);
+        // FIX: se pasa vrControllers como último argumento para que
+        // PlayerController pueda leer getForwardDir() / getRightDir().
+        this.player = new PlayerController(
+            this.scene, this.assets, this.input, this.audio,
+            this.particles, this.vrControllers
+        );
         // skipFBX=true → no carga los 34 MB de modelos (no se renderizan en 1ª persona)
         await this.player.init(true);
         this.player.bindEnemies(this.enemies);
@@ -95,14 +106,8 @@ export class Game {
         this.player.character.group.visible = false;
 
         // ── UI ──────────────────────────────────────────────────────────
-        this.hud = new HUD(this.renderer);
+        this.hud   = new HUD(this.renderer);
         this.vrHud = new VRHud(this.scene, this.renderer);
-
-        // ── VR controllers ──────────────────────────────────────────────
-        this.vrControllers = new VRControllers(this.scene, this.renderer);
-        // El rig contiene los controllers en VR (para que se muevan con el jugador)
-        this.scene.add(this.vrControllers.controllerLeft);
-        this.scene.add(this.vrControllers.controllerRight);
 
         // ── Precompilar shaders ─────────────────────────────────────────
         this.renderer.compile(this.scene, this.cameraRig.camera);
@@ -182,13 +187,15 @@ export class Game {
         this.particles.update(dt);
         this.lighting.update(time);
         this.skybox.update(time);
+        // VR snap-turn
+        if (this.isVR) this.vrControllers.update(dt, this.input.vr);
 
         // ── Cámara: anclar a la posición del jugador (PRIMERA PERSONA) ──
         this.cameraRig.setEyePosition(this.player.position);
 
         // ── UI ──────────────────────────────────────────────────────────
         this.hud.update(this.player.stats);
-        if (this.isVR) this.vrHud.update(this.player.stats, this.player.currentWeapon());
+        if (this.isVR) this.vrHud.update(this.player.stats, this.player.currentWeapon(), dt);
 
         // ── Render ──────────────────────────────────────────────────────
         this.renderer.render(this.scene, this.cameraRig.camera);
