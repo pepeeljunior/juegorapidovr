@@ -1,11 +1,14 @@
 /**
  * Game.js — Orquestador principal del juego.
  *
- * CAMBIOS para primera persona:
- *  - La cámara va EN la cabeza del jugador (no detrás).
- *  - En PC se usa PointerLockControls (mouse mira).
- *  - En VR el rig sigue al jugador; la rotación viene del visor (mover cabeza).
- *  - El personaje completo NO se renderiza desde primera persona.
+ * FIXES PARA META QUEST:
+ *  - renderer.compile() envuelto en try/catch (en Quest a veces falla
+ *    silenciosamente y trunca el init).
+ *  - Llamado a setEyePosition() en cada frame ANTES de cualquier lectura
+ *    de cámara para que el rig esté en su lugar desde el frame 1.
+ *  - Validación del lookYaw para no propagar NaN al resto del juego.
+ *  - Ocultar overlay de pointer-lock si ya entramos a VR.
+ *  - Sin esperar al compile() para terminar el loading.
  */
 import * as THREE      from 'three';
 import { VRButton }    from 'three/addons/webxr/VRButton.js';
@@ -43,7 +46,7 @@ export class Game {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping         = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.6;   // FIX: era 1.0 — subido para escena nocturna
+        this.renderer.toneMappingExposure = 1.6;
         this.renderer.outputColorSpace    = THREE.SRGBColorSpace;
         this.renderer.xr.enabled = true;
         document.getElementById('canvas-container').appendChild(this.renderer.domElement);
@@ -56,7 +59,7 @@ export class Game {
         this.scene.fog = new THREE.FogExp2(WORLD.FOG_COLOR, WORLD.FOG_DENSITY);
 
         this.cameraRig = new CameraRig(this.renderer);
-        this.scene.add(this.cameraRig.rig);   // El rig (que contiene la cámara) va en escena
+        this.scene.add(this.cameraRig.rig);
 
         // ── Sistemas ────────────────────────────────────────────────────
         this.assets    = new AssetLoader('../assets/');
@@ -78,46 +81,44 @@ export class Game {
         this.vegetation = new Vegetation(this.scene);
         this.lighting   = new Lighting(this.scene);
 
-        // HDR removido — el Skybox procedural ya da el ambiente nocturno.
-
         // ── Entidades ───────────────────────────────────────────────────
         this.enemies      = new Enemies(this.scene, this.particles);
         this.collectibles = new Collectibles(this.scene, this.particles);
 
         // ── VR controllers (ANTES del jugador para poder pasarlos) ──────
-        // FIX: vrControllers se crea aquí, antes de PlayerController.
-        // El segundo argumento (playerRig) es el cameraRig.rig, que actúa
-        // como el "cuerpo" del jugador en VR.
         this.vrControllers = new VRControllers(this.scene, this.renderer, this.cameraRig.rig);
 
         // ── Jugador ─────────────────────────────────────────────────────
-        // FIX: se pasa vrControllers como último argumento para que
-        // PlayerController pueda leer getForwardDir() / getRightDir().
         this.player = new PlayerController(
             this.scene, this.assets, this.input, this.audio,
             this.particles, this.vrControllers
         );
-        // skipFBX=true → no carga los 34 MB de modelos (no se renderizan en 1ª persona)
         await this.player.init(true);
         this.player.bindEnemies(this.enemies);
         this.player.bindTerrain(this.terrain);
 
-        // CLAVE: ocultar el personaje en primera persona (la cámara está en su cabeza)
+        // Ocultar personaje (estamos en 1ª persona)
         this.player.character.group.visible = false;
 
         // ── UI ──────────────────────────────────────────────────────────
         this.hud   = new HUD(this.renderer);
         this.vrHud = new VRHud(this.scene, this.renderer);
 
-        // ── Precompilar shaders ─────────────────────────────────────────
-        this.renderer.compile(this.scene, this.cameraRig.camera);
+        // ── Precompilar shaders (PROTEGIDO) ─────────────────────────────
+        // En Quest, compile() puede fallar o tardar mucho. Lo envolvemos
+        // para que no rompa el init.
+        try {
+            this.renderer.compile(this.scene, this.cameraRig.camera);
+        } catch (e) {
+            console.warn('renderer.compile falló (no crítico):', e);
+        }
 
         // ── Eventos ─────────────────────────────────────────────────────
         window.addEventListener('resize', () => this._onResize());
         document.addEventListener('click',    () => this.audio.init(), { once: true });
         document.addEventListener('keydown',  () => this.audio.init(), { once: true });
         document.addEventListener('mousedown', e => {
-            if (e.button === 0 && this.cameraRig.controls.isLocked) {
+            if (e.button === 0 && this.cameraRig.controls && this.cameraRig.controls.isLocked) {
                 this.input.justPressed.add('Mouse0');
             }
         });
@@ -129,16 +130,20 @@ export class Game {
         // ── XR session lifecycle ────────────────────────────────────────
         this.renderer.xr.addEventListener('sessionstart', () => {
             this.isVR = true;
-            this.cameraRig.setEnabled(false);   // unlock PointerLock en PC
+            this.cameraRig.setEnabled(false);
             this.hud.hide();
             this.vrHud.show();
             if (this.cameraRig._lockHint) this.cameraRig._lockHint.style.display = 'none';
+            // Inicializar audio en VR (algunas veces no se activa)
+            this.audio.init();
         });
         this.renderer.xr.addEventListener('sessionend', () => {
             this.isVR = false;
             this.hud.show();
             this.vrHud.hide();
-            if (this.cameraRig._lockHint) this.cameraRig._lockHint.style.display = '';
+            if (this.cameraRig._lockHint && this.cameraRig.controls) {
+                this.cameraRig._lockHint.style.display = '';
+            }
         });
 
         // ── Loop principal ──────────────────────────────────────────────
@@ -150,7 +155,6 @@ export class Game {
     _finishLoading() {
         const el = document.getElementById('loading');
         if (!el) return;
-        // Asegurar que la barra llegue a 100% visualmente
         const bar = document.getElementById('prog');
         if (bar) bar.style.width = '100%';
         el.style.opacity = '0';
@@ -164,15 +168,19 @@ export class Game {
 
         this.input.pollVR();
 
-        // En primera persona, la dirección de movimiento es la que está mirando
-        // la cámara/cabeza (yaw actual)
-        const lookYaw = this.cameraRig.getYaw();
+        // FIX: Posicionar el rig PRIMERO, antes de leer la cámara
+        // Esto asegura que en el frame 1 de XR, la cámara ya esté en su lugar
+        this.cameraRig.setEyePosition(this.player.position);
+
+        // Yaw seguro — validar NaN
+        let lookYaw = this.cameraRig.getYaw();
+        if (isNaN(lookYaw)) lookYaw = 0;
 
         // ── Jugador ─────────────────────────────────────────────────────
         this.player.update(dt, time, lookYaw, this.enemies, this.vegetation.objects, this.isVR);
         this.player.updateProjectiles(dt, this.enemies);
 
-        // ── Enemigos: pasan el callback de daño ────────────────────────
+        // ── Enemigos ────────────────────────────────────────────────────
         const camPos = this.isVR
             ? this.renderer.xr.getCamera().position
             : this.cameraRig.camera.position;
@@ -187,11 +195,10 @@ export class Game {
         this.particles.update(dt);
         this.lighting.update(time);
         this.skybox.update(time);
-        // VR snap-turn
-        if (this.isVR) this.vrControllers.update(dt, this.input.vr);
 
-        // ── Cámara: anclar a la posición del jugador (PRIMERA PERSONA) ──
-        this.cameraRig.setEyePosition(this.player.position);
+        if (this.isVR && this.vrControllers.update) {
+            this.vrControllers.update(dt, this.input.vr);
+        }
 
         // ── UI ──────────────────────────────────────────────────────────
         this.hud.update(this.player.stats);
