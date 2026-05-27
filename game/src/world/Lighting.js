@@ -13,12 +13,12 @@ export class Lighting {
     }
 
     _build() {
-        // ── Ambiental sutil ─────────────────────────────────────────────
-        const ambient = new THREE.AmbientLight(0x4a5a78, 0.35);
+        // ── Ambiental — FIX: subido de 0.35 a 0.75 para que el bosque sea visible ──
+        const ambient = new THREE.AmbientLight(0x6a7a9a, 0.75);
         this.scene.add(ambient);
 
-        // ── Sol tenue cálido (último resplandor del horizonte) ──────────
-        const sun = new THREE.DirectionalLight(0xffb878, 0.6);
+        // ── Sol (último resplandor del horizonte) ───────────────────────
+        const sun = new THREE.DirectionalLight(0xffb878, 0.5);
         sun.position.set(40, 30, 25);
         sun.castShadow = true;
         sun.shadow.mapSize.set(2048, 2048);
@@ -33,13 +33,21 @@ export class Lighting {
         sun.shadow.normalBias = 0.04;
         this.scene.add(sun);
 
-        // ── Hemisférico nocturno (sky bounce) ───────────────────────────
-        const hemi = new THREE.HemisphereLight(0x4060a0, 0x2a2a30, 0.45);
+        // ── Hemisférico nocturno — FIX: subido de 0.45 a 0.7 ───────────
+        const hemi = new THREE.HemisphereLight(0x5070c0, 0x303040, 0.7);
         this.scene.add(hemi);
 
-        // ── Luna FUERTE (luz principal nocturna) ────────────────────────
-        const moon = new THREE.DirectionalLight(0xb8c8ff, 1.4);
+        // ── Luna — FIX: subida de 1.4 a 2.2, es la luz principal ────────
+        const moon = new THREE.DirectionalLight(0xc8d8ff, 2.2);
         moon.position.set(-90, 70, -110);
+        // La luna también castea sombras suaves
+        moon.castShadow = true;
+        moon.shadow.mapSize.set(1024, 1024);
+        moon.shadow.camera.near = 1;
+        moon.shadow.camera.far  = 300;
+        moon.shadow.camera.left = moon.shadow.camera.bottom = -70;
+        moon.shadow.camera.right = moon.shadow.camera.top   =  70;
+        moon.shadow.bias = -0.001;
         this.scene.add(moon);
 
         // ── Hogueras (puntos cálidos con parpadeo) ──────────────────────
