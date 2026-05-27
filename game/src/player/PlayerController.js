@@ -139,7 +139,6 @@ export class PlayerController {
 
         this.turnCD = Math.max(0, this.turnCD - dt);
 
-        // ✅ NUEVO MOVIMIENTO VR
         const speed = running ? PLAYER.RUN_SPEED : PLAYER.WALK_SPEED;
 
         if (moving) {
@@ -148,11 +147,8 @@ export class PlayerController {
             const nz = tZ / len;
 
             let dx, dz;
-
-            // ── VR: usar dirección del headset ─────────────────────────
-            // FIX: solo llamar getForwardDir si isVR Y vrControllers existe.
-            // En desktop se usa el lookYaw de la cámara normal.
-            if (isVR && this.vrControllers) {
+            if (isVR && this.vrControllers?.getForwardDir) {
+                // VR: mover según hacia donde mira el headset
                 const forward = this.vrControllers.getForwardDir();
                 const right   = this.vrControllers.getRightDir();
                 const moveDir = new THREE.Vector3();
@@ -162,7 +158,7 @@ export class PlayerController {
                 dx = moveDir.x;
                 dz = moveDir.z;
             } else {
-                // Desktop: mover en la dirección a la que mira la cámara (lookYaw)
+                // Desktop: mover según el yaw de la cámara
                 const yaw = lookYaw ?? this.rotation;
                 dx =  nx * Math.cos(yaw) + nz * Math.sin(yaw);
                 dz = -nx * Math.sin(yaw) + nz * Math.cos(yaw);
